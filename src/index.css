@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global base styles for a clean, soft, productivity-style look */
+body {
+  @apply bg-slate-100 text-slate-800 antialiased;
+}
+
+/* Makes text rendering look smoother across devices */
+#root {
+  @apply min-h-screen;
+}
