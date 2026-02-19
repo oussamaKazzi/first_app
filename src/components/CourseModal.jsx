@@ -99,7 +99,6 @@ function CourseModal({
 
     if (
       !cleanedPostValues.title ||
-      !cleanedPostValues.imageUrl ||
       !cleanedPostValues.description
     ) {
       return
@@ -227,12 +226,14 @@ function CourseModal({
                   key={post.id}
                   className="overflow-hidden rounded-xl bg-white shadow-lg transition duration-300 hover:scale-105"
                 >
-                  <img
-                    src={post.imageUrl}
-                    alt={post.title}
-                    onClick={() => setViewingImage(post.imageUrl)}
-                    className="h-40 w-full object-cover cursor-pointer hover:opacity-90 transition"
-                  />
+                  {post.imageUrl && (
+                    <img
+                      src={post.imageUrl}
+                      alt={post.title}
+                      onClick={() => setViewingImage(post.imageUrl)}
+                      className="h-40 w-full object-cover cursor-pointer hover:opacity-90 transition"
+                    />
+                  )}
                   <div className="p-4">
                     <h4 className="text-base font-semibold text-slate-900">{post.title}</h4>
                     <p className="mt-2 text-sm text-slate-600">{post.description}</p>
