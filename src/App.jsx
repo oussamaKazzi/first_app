@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import NoteCard from './components/NoteCard'
 import CourseModal from './components/CourseModal'
 
-const STORAGE_KEY = 'study-notes-app-data'
+const API_URL = 'http://localhost:5000'
 
 function App() {
   // Stores all courses, and each course contains a posts array.
@@ -44,18 +44,23 @@ function App() {
     [activeCourse, editingPostId],
   )
 
-  // Loads courses from localStorage once when the app starts.
+  // Loads courses from API once when the app starts.
   useEffect(() => {
-    const savedCourses = localStorage.getItem(STORAGE_KEY)
-    if (savedCourses) {
-      setCourses(JSON.parse(savedCourses))
-    }
+    fetchCourses()
   }, [])
 
-  // Saves courses to localStorage whenever courses change.
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(courses))
-  }, [courses])
+  // Fetch all courses from backend
+  const fetchCourses = async () => {
+    try {
+      const response = await fetch(`${API_URL}/courses`)
+      if (response.ok) {
+        const data = await response.json()
+        setCourses(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch courses:', error)
+    }
+  }
 
   // Clears post edit mode whenever user switches modal course.
   useEffect(() => {
@@ -63,30 +68,48 @@ function App() {
   }, [activeCourseId])
 
   // Handles both adding a new course and updating an existing course.
-  const handleSaveCourse = (courseData) => {
+  const handleSaveCourse = async (courseData) => {
     if (editingCourseId) {
-      setCourses((previousCourses) =>
-        previousCourses.map((course) =>
-          course.id === editingCourseId ? { ...course, ...courseData } : course,
-        ),
-      )
-      setEditingCourseId(null)
+      try {
+        const response = await fetch(`${API_URL}/courses/${editingCourseId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(courseData)
+        })
+        if (response.ok) {
+          const updatedCourse = await response.json()
+          setCourses((previousCourses) =>
+            previousCourses.map((course) =>
+              course.id === editingCourseId ? updatedCourse : course,
+            ),
+          )
+          setEditingCourseId(null)
+        }
+      } catch (error) {
+        console.error('Failed to update course:', error)
+      }
       return
     }
 
-    const courseToAdd = {
-      id: Date.now().toString(),
-      ...courseData,
-      posts: [],
+    try {
+      const response = await fetch(`${API_URL}/courses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(courseData)
+      })
+      if (response.ok) {
+        const newCourse = await response.json()
+        setCourses((previousCourses) => [newCourse, ...previousCourses])
+        setNewlyAddedCourseId(newCourse.id)
+
+        // Remove the animation flag after the effect has played.
+        setTimeout(() => {
+          setNewlyAddedCourseId(null)
+        }, 500)
+      }
+    } catch (error) {
+      console.error('Failed to create course:', error)
     }
-
-    setCourses((previousCourses) => [courseToAdd, ...previousCourses])
-    setNewlyAddedCourseId(courseToAdd.id)
-
-    // Remove the animation flag after the effect has played.
-    setTimeout(() => {
-      setNewlyAddedCourseId(null)
-    }, 500)
   }
 
   // Puts the form into edit mode and auto-fills data through props.
@@ -95,22 +118,31 @@ function App() {
   }
 
   // Asks the user for confirmation before deleting a course.
-  const handleDeleteCourse = (courseId) => {
+  const handleDeleteCourse = async (courseId) => {
     const isConfirmed = window.confirm(
       'Are you sure you want to delete this course and all its posts?',
     )
     if (!isConfirmed) return
 
-    setCourses((previousCourses) =>
-      previousCourses.filter((course) => course.id !== courseId),
-    )
+    try {
+      const response = await fetch(`${API_URL}/courses/${courseId}`, {
+        method: 'DELETE'
+      })
+      if (response.ok) {
+        setCourses((previousCourses) =>
+          previousCourses.filter((course) => course.id !== courseId),
+        )
 
-    if (editingCourseId === courseId) {
-      setEditingCourseId(null)
-    }
+        if (editingCourseId === courseId) {
+          setEditingCourseId(null)
+        }
 
-    if (activeCourseId === courseId) {
-      setActiveCourseId(null)
+        if (activeCourseId === courseId) {
+          setActiveCourseId(null)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete course:', error)
     }
   }
 
@@ -126,39 +158,58 @@ function App() {
   }
 
   // Adds a post or updates a post inside the selected course.
-  const handleSavePost = (postData) => {
+  const handleSavePost = async (postData) => {
     if (!activeCourseId) return
 
     if (editingPostId) {
-      setCourses((previousCourses) =>
-        previousCourses.map((course) => {
-          if (course.id !== activeCourseId) return course
-          return {
-            ...course,
-            posts: course.posts.map((post) =>
-              post.id === editingPostId ? { ...post, ...postData } : post,
-            ),
-          }
-        }),
-      )
-      setEditingPostId(null)
+      try {
+        const response = await fetch(`${API_URL}/courses/${activeCourseId}/posts/${editingPostId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(postData)
+        })
+        if (response.ok) {
+          const updatedPost = await response.json()
+          setCourses((previousCourses) =>
+            previousCourses.map((course) => {
+              if (course.id !== activeCourseId) return course
+              return {
+                ...course,
+                posts: course.posts.map((post) =>
+                  post.id === editingPostId ? updatedPost : post,
+                ),
+              }
+            }),
+          )
+          setEditingPostId(null)
+        }
+      } catch (error) {
+        console.error('Failed to update post:', error)
+      }
       return
     }
 
-    const postToAdd = {
-      id: (Date.now() + Math.random()).toString(),
-      ...postData,
+    try {
+      const response = await fetch(`${API_URL}/courses/${activeCourseId}/posts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(postData)
+      })
+      if (response.ok) {
+        const newPost = await response.json()
+        setCourses((previousCourses) =>
+          previousCourses.map((course) => {
+            if (course.id !== activeCourseId) return course
+            return {
+              ...course,
+              posts: [newPost, ...course.posts],
+            }
+          }),
+        )
+      }
+    } catch (error) {
+      console.error('Failed to create post:', error)
     }
-
-    setCourses((previousCourses) =>
-      previousCourses.map((course) => {
-        if (course.id !== activeCourseId) return course
-        return {
-          ...course,
-          posts: [postToAdd, ...course.posts],
-        }
-      }),
-    )
   }
 
   // Enables post edit mode in modal.
@@ -167,46 +218,65 @@ function App() {
   }
 
   // Deletes a post from selected course after confirmation.
-  const handleDeletePost = (postId) => {
+  const handleDeletePost = async (postId) => {
     const isConfirmed = window.confirm(
       'Are you sure you want to delete this post?',
     )
     if (!isConfirmed) return
 
-    setCourses((previousCourses) =>
-      previousCourses.map((course) => {
-        if (course.id !== activeCourseId) return course
-        return {
-          ...course,
-          posts: course.posts.filter((post) => post.id !== postId),
-        }
-      }),
-    )
+    try {
+      const response = await fetch(`${API_URL}/courses/${activeCourseId}/posts/${postId}`, {
+        method: 'DELETE'
+      })
+      if (response.ok) {
+        setCourses((previousCourses) =>
+          previousCourses.map((course) => {
+            if (course.id !== activeCourseId) return course
+            return {
+              ...course,
+              posts: course.posts.filter((post) => post.id !== postId),
+            }
+          }),
+        )
 
-    if (editingPostId === postId) {
-      setEditingPostId(null)
+        if (editingPostId === postId) {
+          setEditingPostId(null)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete post:', error)
     }
   }
 
   // Creates a new empty course with default values.
-  const handleQuickAddCourse = () => {
+  const handleQuickAddCourse = async () => {
     if (!quickCourseName.trim()) return
 
-    const courseToAdd = {
-      id: Date.now().toString(),
+    const courseData = {
       title: quickCourseName.trim(),
-      description: '',
-      posts: [],
+      description: ''
     }
 
-    setCourses((previousCourses) => [courseToAdd, ...previousCourses])
-    setNewlyAddedCourseId(courseToAdd.id)
-    setQuickCourseName('')
-    setShowQuickAddForm(false)
+    try {
+      const response = await fetch(`${API_URL}/courses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(courseData)
+      })
+      if (response.ok) {
+        const newCourse = await response.json()
+        setCourses((previousCourses) => [newCourse, ...previousCourses])
+        setNewlyAddedCourseId(newCourse.id)
+        setQuickCourseName('')
+        setShowQuickAddForm(false)
 
-    setTimeout(() => {
-      setNewlyAddedCourseId(null)
-    }, 500)
+        setTimeout(() => {
+          setNewlyAddedCourseId(null)
+        }, 500)
+      }
+    } catch (error) {
+      console.error('Failed to create course:', error)
+    }
   }
 
   // Cancels the quick add form.

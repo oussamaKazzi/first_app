@@ -21,6 +21,9 @@ function CourseModal({
   // Tracks which image is being viewed in full size.
   const [viewingImage, setViewingImage] = useState(null)
 
+  // Controls visibility of the add post form.
+  const [showPostForm, setShowPostForm] = useState(false)
+
   // Auto-fill fields when user edits a post.
   useEffect(() => {
     if (postBeingEdited) {
@@ -29,6 +32,7 @@ function CourseModal({
         imageUrl: postBeingEdited.imageUrl,
         description: postBeingEdited.description,
       })
+      setShowPostForm(true)
       return
     }
 
@@ -60,6 +64,29 @@ function CourseModal({
     reader.readAsDataURL(file)
   }
 
+  // Handles pasting images from clipboard (e.g., screenshots).
+  const handlePaste = (event) => {
+    const items = event.clipboardData?.items
+    if (!items) return
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const blob = items[i].getAsFile()
+        if (!blob) continue
+
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          setPostFormValues((previousValues) => ({
+            ...previousValues,
+            imageUrl: e.target?.result || '',
+          }))
+        }
+        reader.readAsDataURL(blob)
+        break
+      }
+    }
+  }
+
   // Save post data (add or update) via parent handlers.
   const handlePostSubmit = (event) => {
     event.preventDefault()
@@ -80,16 +107,16 @@ function CourseModal({
 
     onSavePost(cleanedPostValues)
 
-    // Clear form if currently adding a new post.
-    if (!postBeingEdited) {
-      setPostFormValues(INITIAL_POST_FORM)
-    }
+    // Clear form and hide it after successful save.
+    setPostFormValues(INITIAL_POST_FORM)
+    setShowPostForm(false)
   }
 
   // Cancel post edit and reset form in UI.
   const handleCancelEditClick = () => {
     onCancelPostEdit()
     setPostFormValues(INITIAL_POST_FORM)
+    setShowPostForm(false)
   }
 
   return (
@@ -109,65 +136,75 @@ function CourseModal({
         </div>
 
         <div className="space-y-6 p-6">
-          <form
-            onSubmit={handlePostSubmit}
-            className="rounded-xl bg-slate-50 p-4 shadow-lg space-y-3"
-          >
-            <h3 className="text-lg font-semibold text-slate-900">
-              {postBeingEdited ? 'Edit Post' : 'Add New Post'}
-            </h3>
-
-            <input
-              type="text"
-              name="title"
-              value={postFormValues.title}
-              onChange={handlePostInputChange}
-              placeholder="Post title"
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              required
-            />
-
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handlePostImageUpload}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              required={!postBeingEdited || !postFormValues.imageUrl}
-            />
-            {postFormValues.imageUrl && (
-              <div className="mt-3 rounded-lg overflow-hidden shadow-md">
-                <img
-                  src={postFormValues.imageUrl}
-                  alt="Post preview"
-                  onClick={() => setViewingImage(postFormValues.imageUrl)}
-                  className="w-full h-32 object-cover cursor-pointer hover:opacity-90 transition"
-                />
-              </div>
-            )}
-
-            <textarea
-              name="description"
-              value={postFormValues.description}
-              onChange={handlePostInputChange}
-              placeholder="Write post description..."
-              rows={4}
-              className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              required
-            />
-
-            <div className="flex flex-wrap gap-3">
+          {!showPostForm ? (
+            <div className="flex justify-center">
               <button
-                type="submit"
-                className={`rounded-lg px-5 py-2.5 text-sm font-medium text-white transition duration-300 ${
-                  postBeingEdited
-                    ? 'bg-yellow-500 hover:bg-yellow-600'
-                    : 'bg-blue-600 hover:bg-blue-700'
-                }`}
+                onClick={() => setShowPostForm(true)}
+                className="rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition duration-300 hover:bg-blue-700 shadow-lg"
               >
-                {postBeingEdited ? 'Update Post' : 'Add Post'}
+                ➕ Add New Post
               </button>
+            </div>
+          ) : (
+            <form
+              onSubmit={handlePostSubmit}
+              onPaste={handlePaste}
+              className="rounded-xl bg-slate-50 p-4 shadow-lg space-y-3 animate-fadeIn"
+            >
+              <h3 className="text-lg font-semibold text-slate-900">
+                {postBeingEdited ? 'Edit Post' : 'Add New Post'}
+              </h3>
 
-              {postBeingEdited && (
+              <input
+                type="text"
+                name="title"
+                value={postFormValues.title}
+                onChange={handlePostInputChange}
+                placeholder="Post title"
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                required
+              />
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePostImageUpload}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                required={!postBeingEdited || !postFormValues.imageUrl}
+              />
+              {postFormValues.imageUrl && (
+                <div className="mt-3 rounded-lg overflow-hidden shadow-md">
+                  <img
+                    src={postFormValues.imageUrl}
+                    alt="Post preview"
+                    onClick={() => setViewingImage(postFormValues.imageUrl)}
+                    className="w-full h-32 object-cover cursor-pointer hover:opacity-90 transition"
+                  />
+                </div>
+              )}
+
+              <textarea
+                name="description"
+                value={postFormValues.description}
+                onChange={handlePostInputChange}
+                placeholder="Write post description..."
+                rows={4}
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                required
+              />
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="submit"
+                  className={`rounded-lg px-5 py-2.5 text-sm font-medium text-white transition duration-300 ${
+                    postBeingEdited
+                      ? 'bg-yellow-500 hover:bg-yellow-600'
+                      : 'bg-blue-600 hover:bg-blue-700'
+                  }`}
+                >
+                  {postBeingEdited ? 'Update Post' : 'Add Post'}
+                </button>
+
                 <button
                   type="button"
                   onClick={handleCancelEditClick}
@@ -175,9 +212,9 @@ function CourseModal({
                 >
                   Cancel
                 </button>
-              )}
-            </div>
-          </form>
+              </div>
+            </form>
+          )}
 
           {course.posts.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500 shadow-lg">
